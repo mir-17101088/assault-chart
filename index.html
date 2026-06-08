@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rise, fall, rise again — ASK Bangladesh</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,800;1,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --ink: #111111;
+      --paper: #f5f0e8;
+      --paper-dark: #e8e1d5;
+      --rule: #d0c8b8;
+      --muted: #6b6358;
+      --c-incidents: #1a365d;
+      --c-killed: #9e2a2b;
+      --c-suicide: #b87a3d;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--paper);
+      font-family: 'IBM Plex Sans', sans-serif;
+      color: var(--ink);
+      -webkit-text-size-adjust: 100%;
+    }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      border-top: 5px solid var(--ink);
+      padding: clamp(0.75rem, 2vw, 1.5rem) clamp(1rem, 4vw, 3rem) clamp(0.5rem, 2vw, 1rem);
+      position: relative;
+      background: var(--paper);
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: clamp(14px, 3vw, 18px);
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--rule);
+    }
+
+    header {
+      flex-shrink: 0;
+      margin-bottom: clamp(0.5rem, 2vw, 1.5rem);
+      padding-top: 0.5rem;
+      z-index: 1;
+    }
+
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2.2rem, 7vw, 4rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin-bottom: clamp(0.75rem, 2vw, 1.25rem);
+    }
+
+    h1 em {
+      font-style: italic;
+      font-weight: 600;
+      color: var(--c-killed);
+    }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      padding: 0.4rem 0.75rem;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .legend-item:hover,
+    .legend-item:focus-visible {
+      background: var(--paper-dark);
+      border-color: var(--rule);
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    .legend-item:active {
+      transform: translateY(0);
+    }
+
+    .legend-item.hidden {
+      opacity: 0.4;
+      filter: grayscale(50%);
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+    }
+
+    .legend-label {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: clamp(0.65rem, 1.8vw, 0.75rem);
+      letter-spacing: 0.03em;
+      color: var(--ink);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    /* Chart */
+    .chart-wrap {
+      position: relative;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .chart-container {
+      flex: 1;
+      position: relative;
+      min-height: 0;
+      width: 100%;
+    }
+
+    canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* Footer */
+    footer {
+      flex-shrink: 0;
+      border-top: 1px solid var(--rule);
+      padding-top: 0.75rem;
+      margin-top: clamp(0.5rem, 1.5vw, 1rem);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+    }
+
+    .source {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: clamp(0.55rem, 1.5vw, 0.65rem);
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .axis-legend {
+      display: flex;
+      gap: 0.8rem 1.2rem;
+      flex-wrap: wrap;
+    }
+
+    .axis-tag {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: clamp(0.55rem, 1.5vw, 0.65rem);
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .axis-tag span {
+      display: inline-block;
+      width: 12px;
+      height: 2px;
+      flex-shrink: 0;
+    }
+
+    /* Tooltip */
+    #chartTooltip {
+      pointer-events: none;
+      position: absolute;
+      background: rgba(26, 26, 26, 0.95);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      color: var(--paper);
+      padding: 0.8rem 1rem;
+      border-radius: 6px;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: clamp(0.75rem, 2vw, 0.85rem);
+      min-width: 160px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      opacity: 0;
+      transition: opacity 0.2s ease, transform 0.1s ease;
+      z-index: 10;
+    }
+
+    #chartTooltip .tt-year {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(1.05rem, 3vw, 1.25rem);
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+      padding-bottom: 0.4rem;
+      letter-spacing: 0.02em;
+    }
+
+    #chartTooltip .tt-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.4rem;
+      line-height: 1.4;
+    }
+
+    #chartTooltip .tt-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+    }
+
+    #chartTooltip .tt-label {
+      flex: 1;
+      font-size: 0.85em;
+      opacity: 0.9;
+    }
+
+    #chartTooltip .tt-val {
+      font-weight: 500;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.85em;
+    }
+
+    @media (max-width: 480px) {
+      .axis-legend {
+        display: none;
+      }
+
+      .legend {
+        gap: 0.4rem 0.6rem;
+      }
+
+      .legend-item {
+        padding: 0.3rem 0.5rem;
+      }
+
+      .card {
+        padding-left: 0.8rem;
+        padding-right: 0.8rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <header>
+      <h1><em>Rise,</em> fall, <em>rise again</em></h1>
+      <div class="legend" id="legend"></div>
+    </header>
+
+    <div class="chart-wrap">
+      <div class="chart-container">
+        <canvas id="incidentsChart"></canvas>
+      </div>
+      <div class="chart-container">
+        <canvas id="fatalitiesChart"></canvas>
+      </div>
+      <div id="chartTooltip"></div>
+    </div>
+
+    <footer>
+      <span class="source">Source: Ain o Salish Kendra (ASK)</span>
+      <div class="axis-legend">
+        <span class="axis-tag"><span style="background:var(--c-incidents)"></span>Top — Incidents</span>
+        <span class="axis-tag"><span style="background:var(--c-killed)"></span>Bottom — Fatal outcomes</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    const years = [2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
+    const incidents = [998, 707, 846, 724, 922, 835, 1637, 1953, 1614, 1094, 703, 510, 979];
+    const killed = [87, 68, 60, 37, 47, 63, 79, 57, 54, 48, 36, 34, 42];
+    const suicide = [14, 13, 2, 8, 12, 7, 13, 17, 10, 9, 8, 7, 7];
+
+    const COLORS = { incidents: '#1a365d', killed: '#9e2a2b', suicide: '#b87a3d' };
+
+    const seriesMeta = [
+      { key: 'incidents', label: 'Total Incidents', color: COLORS.incidents, data: incidents },
+      { key: 'killed', label: 'Killed after rape/attempt', color: COLORS.killed, data: killed },
+      { key: 'suicide', label: 'Suicide', color: COLORS.suicide, data: suicide },
+    ];
+
+    /* ── Utilities ── */
+    const isMobile = () => window.innerWidth <= 480;
+    function tickFontSize() { return isMobile() ? 12 : 15; }
+    function pointRadius() { return isMobile() ? 3 : 4; }
+    function pointHover() { return isMobile() ? 5 : 6; }
+
+    /* ── Tooltip Logic ── */
+    function externalTooltip(context) {
+      const tooltip = context.tooltip;
+      const chartInstance = context.chart;
+      const el = document.getElementById('chartTooltip');
+      
+      if (tooltip.opacity === 0) { 
+        el.style.opacity = '0'; 
+        return; 
+      }
+
+      if (!tooltip.dataPoints || tooltip.dataPoints.length === 0) return;
+      
+      const index = tooltip.dataPoints[0].dataIndex;
+      const year = years[index];
+
+      let rows = '';
+      seriesMeta.forEach((s) => {
+        let isHidden = false;
+        if (s.key === 'incidents') {
+           isHidden = incidentsChart.getDatasetMeta(0).hidden;
+        } else {
+           const dsIndex = s.key === 'killed' ? 0 : 1;
+           isHidden = fatalitiesChart.getDatasetMeta(dsIndex).hidden;
+        }
+
+        if (isHidden) return;
+        
+        rows += `<div class="tt-row">
+          <div class="tt-dot" style="background:${s.color}"></div>
+          <span class="tt-label">${s.label}</span>
+          <span class="tt-val">${Number(s.data[index]).toLocaleString()}</span>
+        </div>`;
+      });
+      
+      // If all datasets are hidden, don't show the tooltip
+      if (!rows) {
+        el.style.opacity = '0';
+        return;
+      }
+
+      el.innerHTML = `<div class="tt-year">${year}</div>${rows}`;
+
+      // Positioning
+      const wrapRect = document.querySelector('.chart-wrap').getBoundingClientRect();
+      const chartRect = chartInstance.canvas.getBoundingClientRect();
+      
+      // Ensure element is visible to get dimensions
+      el.style.opacity = '1';
+      const ttRect = el.getBoundingClientRect();
+      const ttW = ttRect.width || 170;
+      const ttH = ttRect.height || 100;
+
+      // Absolute position within the .chart-wrap
+      let absoluteX = tooltip.caretX + (chartRect.left - wrapRect.left);
+      let absoluteY = tooltip.caretY + (chartRect.top - wrapRect.top);
+
+      let left = absoluteX + 16;
+      let top = absoluteY - (ttH / 2);
+
+      if (left + ttW > wrapRect.width - 12) {
+        left = absoluteX - ttW - 16; // Flip to left side of cursor
+      }
+      left = Math.max(12, left); // clamp left
+      
+      top = Math.max(12, top); // clamp top
+      if (top + ttH > wrapRect.height - 12) {
+        top = wrapRect.height - ttH - 12; // clamp bottom
+      }
+
+      el.style.left = left + 'px';
+      el.style.top = top + 'px';
+    }
+
+    const commonOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false, external: externalTooltip },
+      },
+      onHover: (e, elements, chart) => {
+        const otherChart = chart === incidentsChart ? fatalitiesChart : incidentsChart;
+        if (elements && elements.length > 0) {
+          const index = elements[0].index;
+          const otherElements = [];
+          otherChart.data.datasets.forEach((ds, i) => {
+            if (!otherChart.getDatasetMeta(i).hidden) {
+              otherElements.push({ datasetIndex: i, index: index });
+            }
+          });
+          otherChart.setActiveElements(otherElements);
+          otherChart.update('none');
+        } else {
+          otherChart.setActiveElements([]);
+          otherChart.update('none');
+        }
+      }
+    };
+
+    /* ── Charts Initialization ── */
+    const incidentsCtx = document.getElementById('incidentsChart').getContext('2d');
+    const fatalitiesCtx = document.getElementById('fatalitiesChart').getContext('2d');
+
+    const incidentsDataset = {
+      label: seriesMeta[0].label,
+      data: seriesMeta[0].data,
+      borderColor: seriesMeta[0].color,
+      backgroundColor: seriesMeta[0].color + '1A',
+      pointBackgroundColor: seriesMeta[0].color,
+      pointBorderColor: '#f5f0e8',
+      pointBorderWidth: 1.5,
+      pointRadius: pointRadius(),
+      pointHoverRadius: pointHover(),
+      borderWidth: 2.5,
+      tension: 0.4,
+      fill: true,
+    };
+
+    const fatalitiesDatasets = [
+      {
+        label: seriesMeta[1].label,
+        data: seriesMeta[1].data,
+        borderColor: seriesMeta[1].color,
+        backgroundColor: seriesMeta[1].color + '0A',
+        pointBackgroundColor: seriesMeta[1].color,
+        pointBorderColor: '#f5f0e8',
+        pointBorderWidth: 1.5,
+        pointRadius: pointRadius(),
+        pointHoverRadius: pointHover(),
+        borderWidth: 2,
+        tension: 0.4,
+        fill: false,
+      },
+      {
+        label: seriesMeta[2].label,
+        data: seriesMeta[2].data,
+        borderColor: seriesMeta[2].color,
+        backgroundColor: seriesMeta[2].color + '0A',
+        pointBackgroundColor: seriesMeta[2].color,
+        pointBorderColor: '#f5f0e8',
+        pointBorderWidth: 1.5,
+        pointRadius: pointRadius(),
+        pointHoverRadius: pointHover(),
+        borderWidth: 2,
+        tension: 0.4,
+        fill: false,
+      }
+    ];
+
+    const incidentsChart = new Chart(incidentsCtx, {
+      type: 'line',
+      data: { labels: years, datasets: [incidentsDataset] },
+      options: {
+        ...commonOptions,
+        layout: { padding: { top: 10, bottom: 0, right: 10 } },
+        scales: {
+          x: {
+            grid: { color: 'rgba(107, 99, 88, 0.15)', drawTicks: false, tickLength: 0 },
+            ticks: { display: false },
+            border: { display: false },
+          },
+          y: {
+            position: 'left',
+            afterFit: function(scale) { scale.width = isMobile() ? 50 : 85; },
+            grid: { color: 'rgba(107, 99, 88, 0.15)', drawTicks: false, tickLength: 0 },
+            ticks: {
+              font: { family: "'IBM Plex Mono'", size: tickFontSize(), weight: '500' },
+              color: COLORS.incidents,
+              callback: v => isMobile() ? (v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v) : v.toLocaleString(),
+              maxTicksLimit: 5,
+              padding: 6
+            },
+            border: { display: false },
+            title: {
+              display: true,
+              text: 'Incidents',
+              font: { family: "'IBM Plex Mono'", size: tickFontSize() + 2, weight: '600' },
+              color: COLORS.incidents,
+            }
+          }
+        }
+      }
+    });
+
+    const fatalitiesChart = new Chart(fatalitiesCtx, {
+      type: 'line',
+      data: { labels: years, datasets: fatalitiesDatasets },
+      options: {
+        ...commonOptions,
+        layout: { padding: { top: 0, right: 10 } },
+        scales: {
+          x: {
+            grid: { color: 'rgba(107, 99, 88, 0.15)', drawTicks: false, tickLength: 0 },
+            ticks: {
+              font: { family: "'IBM Plex Mono'", size: tickFontSize(), weight: '500' },
+              color: '#6b6358',
+              maxRotation: 0,
+              autoSkip: true,
+              maxTicksLimit: isMobile() ? 6 : 13,
+              padding: 6
+            },
+            border: { display: false },
+          },
+          y: {
+            position: 'left',
+            afterFit: function(scale) { scale.width = isMobile() ? 50 : 85; },
+            grid: { color: 'rgba(107, 99, 88, 0.15)', drawTicks: false, tickLength: 0 },
+            ticks: {
+              font: { family: "'IBM Plex Mono'", size: tickFontSize(), weight: '500' },
+              color: COLORS.killed,
+              callback: v => v.toLocaleString(),
+              maxTicksLimit: 5,
+              padding: 6,
+            },
+            border: { display: false },
+            title: {
+              display: true,
+              text: 'Fatal',
+              font: { family: "'IBM Plex Mono'", size: tickFontSize() + 2, weight: '600' },
+              color: COLORS.killed,
+            },
+            min: 0, 
+            max: 110,
+          }
+        }
+      }
+    });
+
+    /* Hide cross-chart elements when leaving wrap */
+    document.querySelector('.chart-wrap').addEventListener('mouseleave', () => {
+      document.getElementById('chartTooltip').style.opacity = '0';
+      incidentsChart.setActiveElements([]);
+      fatalitiesChart.setActiveElements([]);
+      incidentsChart.update('none');
+      fatalitiesChart.update('none');
+    });
+
+    /* ── Legend ── */
+    const legendEl = document.getElementById('legend');
+    const hiddenSeries = new Set();
+
+    seriesMeta.forEach((s, i) => {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.setAttribute('role', 'button');
+      item.setAttribute('tabindex', '0');
+      item.setAttribute('aria-label', `Toggle ${s.label}`);
+      item.innerHTML = `<div class="legend-dot" style="background:${s.color}"></div><span class="legend-label">${s.label}</span>`;
+
+      const toggle = () => {
+        let targetChart, dsIndex;
+        if (s.key === 'incidents') {
+          targetChart = incidentsChart;
+          dsIndex = 0;
+        } else if (s.key === 'killed') {
+          targetChart = fatalitiesChart;
+          dsIndex = 0;
+        } else if (s.key === 'suicide') {
+          targetChart = fatalitiesChart;
+          dsIndex = 1;
+        }
+
+        const meta = targetChart.getDatasetMeta(dsIndex);
+        if (hiddenSeries.has(i)) { 
+          hiddenSeries.delete(i); 
+          meta.hidden = false; 
+          item.classList.remove('hidden'); 
+        } else { 
+          hiddenSeries.add(i); 
+          meta.hidden = true; 
+          item.classList.add('hidden'); 
+        }
+        targetChart.update();
+      };
+      item.addEventListener('click', toggle);
+      item.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+      legendEl.appendChild(item);
+    });
+
+    /* ── Resize Handling ── */
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const mobile = isMobile();
+        
+        fatalitiesChart.options.scales.x.ticks.maxTicksLimit = mobile ? 6 : 13;
+        fatalitiesChart.options.scales.x.ticks.font.size = tickFontSize();
+        
+        incidentsChart.options.scales.y.ticks.font.size = tickFontSize();
+        fatalitiesChart.options.scales.y.ticks.font.size = tickFontSize();
+        
+        incidentsChart.options.scales.y.title.font.size = tickFontSize() + 2;
+        fatalitiesChart.options.scales.y.title.font.size = tickFontSize() + 2;
+
+        [incidentsChart, fatalitiesChart].forEach(c => {
+          c.data.datasets.forEach(ds => { 
+            ds.pointRadius = pointRadius(); 
+            ds.pointHoverRadius = pointHover(); 
+          });
+          c.update('none');
+        });
+      }, 100);
+    });
+  </script>
+</body>
+
+</html>
